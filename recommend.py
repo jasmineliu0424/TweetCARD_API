@@ -26,7 +26,6 @@ def parking_discount(lat,lng,place_name,auth_id): #用戶擁有的卡種編號(l
     
     #判斷是否符合資格
     for cardID, level in tmp_card_dict['cardID'].items():
-        print('park cardID: ',cardID)
         #level=level[:-2] #把正卡/副卡去掉
         #抓取該信用卡的優惠內容
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
@@ -80,9 +79,9 @@ def parking_discount(lat,lng,place_name,auth_id): #用戶擁有的卡種編號(l
         recommend_list.update({'fir_recommend_cardID':None,'fir_recommend_card':None,'fir_recommend_discount':None,'fir_recommend_bank':None})
         recommend_list.update({'sec_recommend_cardID':None,'sec_recommend_card':None,'sec_recommend_discount':None,'sec_recommend_bank':None})
         recommend_list.update({'thr_recommend_cardID':None,'thr_recommend_card':None,'thr_recommend_discount':None,'thr_recommend_bank':None})
-    #resp = dumps(parking_recommend_list)
     return recommend_list
 
+# 現金回饋
 def cash_return_discount(lat,lng,place_name,auth_id): #用戶擁有的卡種編號(list)
     cash_recommend_list=[]
 
@@ -92,7 +91,6 @@ def cash_return_discount(lat,lng,place_name,auth_id): #用戶擁有的卡種編�
     tmp_card_dict = json.loads(cards_tmp) #dict
     
     for cardID, level in tmp_card_dict['cardID'].items():
-        print('cardID: ',cardID)
         #level=level[:-2] #把正卡/副卡去掉
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
@@ -166,10 +164,10 @@ def cash_return_discount(lat,lng,place_name,auth_id): #用戶擁有的卡種編�
     #resp = dumps(parking_recommend_list)
     return recommend_list    
 
-#推薦順序：現折優惠>現金回饋>加油金>加油點數
-#除非能得到使用者欲加公升數與當前加油站油價，否則無法比較
-#加油點數目前只考慮汽車
-#加油方式是取記帳紀錄裡頻率較高的那個
+# 加油優惠
+# 推薦順序：現折優惠>現金回饋>加油金>加油點數
+# 加油點數目前只考慮汽車
+# 加油方式是取記帳紀錄裡頻率較高的那個
 def gas_discount(lat,lng,place_name,auth_id):
     save_recommend=[] #現折優惠
     reward_recommend=[] #現金回饋
@@ -320,9 +318,10 @@ def gas_discount(lat,lng,place_name,auth_id):
         recommend_list.update({'thr_recommend_cardID':None,'thr_recommend_card':None,'thr_recommend_discount':None,'thr_recommend_bank':None})
     return recommend_list
 
-#只包含銀行本身的紅利點數
-#會用地點名稱與地點類型去篩可用地點
-#recommend_discount回傳string list([紅利倍數,紅利幾元一點])
+# 紅利回饋
+# 只包含銀行本身的紅利點數(Ex:Line point不算)
+# 會用地點名稱與地點類型去篩可用地點
+# recommend_discount回傳string list([紅利倍數,紅利幾元一點])
 def point_return_discount(lat,lng,place_name,place_type,auth_id):
     point_recommend_list=[]
     
@@ -332,7 +331,6 @@ def point_return_discount(lat,lng,place_name,place_type,auth_id):
     tmp_card_dict = json.loads(cards_tmp) #dict
     
     for cardID, level in tmp_card_dict['cardID'].items():
-        print('point cardid: ', cardID)
         #level=level[:-2] #把正卡/副卡去掉
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
@@ -440,8 +438,9 @@ def point_return_discount(lat,lng,place_name,place_type,auth_id):
         recommend_list.update({'thr_recommend_cardID':None,'thr_recommend_card':None,'thr_recommend_discount':None,'thr_recommend_bank':None})
     return recommend_list
 
-#幾折優先於幾元(除非能取得預計消費消費)
-#recommend_discount回傳string(ex:'6折')
+# 電影優惠
+# 幾折優先於幾元(除非能取得預計消費消費)
+# recommend_discount回傳string(ex:'6折')
 def movie_discount(lat,lng,place_name,auth_id):
     che_recommend_list=[]
     wen_recommend_list=[]
@@ -452,9 +451,7 @@ def movie_discount(lat,lng,place_name,auth_id):
     tmp_card_dict = json.loads(cards_tmp) #dict
     week=['週一','週二','週三','週四','週五','週六','週日']
     weekday=week[datetime.today().weekday()] #取得今天星期幾
-    print('auth_id: ',auth_id)
     for cardID, level in tmp_card_dict['cardID'].items():
-        print('cardID: ',cardID)
         #level=level[:-2] #把正卡/副卡去掉
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
@@ -525,13 +522,9 @@ def movie_discount(lat,lng,place_name,auth_id):
 
 # 須考慮是否符合職業與年收入低標
 
-# 回傳(座標，卡種編號，優惠時數(str)(可停x小時)，卡名，銀行) 
-# 停車優惠：{‘上個月帳單限制’:20000,‘前三個月帳單限制’:100000,‘前十二個月帳單限制’:600000}
-# 不包含百貨公司內的停車場
 # app回傳座標跟地點名稱 'lat':lat,'lng':lng,'地點名稱':
 # 用同群且有該卡的人的帳單
 def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,rd_or_ap): #用戶擁有的卡種編號(list) #rd_or_ap: 0:rd, 1:ap
-    print('in park recommend')
     card_dict=[] #用戶所沒有的卡種編號 [{'卡種編號'},{'卡種編號']]
     parking_recommend_list=[]
 
@@ -544,13 +537,11 @@ def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_au
     own_cards = mongo.db.cusCreditCard.find_one({'id': auth_id}) #Bson
     own_cards_tmp = dumps(own_cards) #Json
     own_tmp_card_dict = json.loads(own_cards_tmp)
-    #print('own card:',own_tmp_card_dict)
     #取出所有卡片
     #須考慮年收入是否高於年收入低標，職業是否符合或不限
     cards = mongo.db.creditCard.find({'annIncomeLimit':{'$lte': info_dict['annualIncome']}, 'occuLimit':{'$in':[info_dict['occupation'],"不限"]}}) #Bson
     cards_tmp = dumps(cards) #Json
     tmp_card_dict = json.loads(cards_tmp)
-    #print('all card:',tmp_card_dict)
     #將此用戶沒有的卡存入card_dict
     if(own_tmp_card_dict['cardID'] is None): #該用戶一張卡都沒有
         card_dict=tmp_card_dict
@@ -558,12 +549,10 @@ def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_au
         for elem in tmp_card_dict:
             if(elem['cardID'] not in own_tmp_card_dict['cardID'].keys()):
                 card_dict.append(elem)
-    #print('park card: ',card_dict)
     #判斷是否符合資格
     for tmp_card in card_dict:
         similar_person_id=""
         cardID=tmp_card['cardID']
-        print('park cardID:',cardID)
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
         tmp_dict = json.loads(resp_tmp) #dict
@@ -589,18 +578,13 @@ def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_au
             feature_value['annualIncome']=cus_tmp_dict['annualIncome']
             feature_value['expenseMonth']=cus_tmp_dict['expenseMonth'] #要再寫一個計算的
             similar_persons=context.find_similar_(auth_id,feature_value)
-            #print('length of sim: ',len(similar_persons))
-            #print('sim persons:',similar_persons)
             for person in similar_persons:
-                #print('person:',person)
                 sim_per_card = mongo.db.cusCreditCard.find_one({'id': person['id']}) #Bson
                 sim_resp_tmp = dumps(sim_per_card) #Json
                 sim_tmp_dict = json.loads(sim_resp_tmp) #dict
                 if cardID in sim_tmp_dict['cardID'].keys():
                     similar_person_id=similar_person_id+person['id']
-                    print('yes! sim id:',similar_person_id)
                     break
-            #print('sim id: ',similar_person_id)
             #取出此人此卡的level
             per_cards = mongo.db.cusCreditCard.find_one({'id': similar_person_id}) #Bson
             per_cards_tmp = dumps(per_cards) #Json
@@ -609,31 +593,22 @@ def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_au
             #level=level[:-2] #把正卡/副卡去掉
         #dict空值為None 
         if(tmp_dict['parkingRewMax'] is not None ):
-            print('have park reward')
             can_park=0
             for i in tmp_dict['parkingRewLocation']:
-                print('park location: ',i)
-                print('cur place name: ',place_name)
                 if(i in place_name or place_name in i or place_name==i):
-                    print('same place')
                     can_park=1
             if(can_park==1):
-                print('CAN PARK!')
                 if(tmp_dict['parkingRewStatementMin']['上個月帳單限制'] is not None and total_consumption_last_month(cardID,similar_person_id)>tmp_dict['parkingRewStatementMin']['上個月帳單限制']):
-                    print('past 1')
                     if(type(tmp_dict['parkingRewMax'])==dict and level in tmp_dict['parkingRewMax'].keys()):
-                        print('level')
                         parking_recommend_list.append({'cardID':cardID,'優惠時數':tmp_dict['parkingRewMax'][level],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName']})
                     else: #沒有等級差別
                         parking_recommend_list.append({'cardID':cardID,'優惠時數':tmp_dict['parkingRewMax'],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName']})
                 elif(tmp_dict['parkingRewStatementMin']['前三個月帳單限制'] is not None and total_consumption_last_three_months(cardID,similar_person_id)>tmp_dict['parkingRewStatementMin']['前三個月帳單限制']):
-                    print('past 3')
                     if(type(tmp_dict['parkingRewMax'])==dict and level in tmp_dict['parkingRewMax'].keys()):
                         parking_recommend_list.append({'cardID':cardID,'優惠時數':tmp_dict['parkingRewMax'][level],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName']})
                     else:
                         parking_recommend_list.append({'cardID':cardID,'優惠時數':tmp_dict['parkingRewMax'],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName']}) 
                 elif(tmp_dict['parkingRewStatementMin']['前十二個月帳單限制'] is not None and total_consumption_last_year(cardID,similar_person_id)>tmp_dict['parkingRewStatementMin']['前十二個月帳單限制']):
-                    print('past 12')
                     if(type(tmp_dict['parkingRewMax'])==dict and level in tmp_dict['parkingRewMax'].keys()):
                         parking_recommend_list.append({'cardID':cardID,'優惠時數':tmp_dict['parkingRewMax'][level],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName']})
                     else:
@@ -675,7 +650,6 @@ def parking_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_au
 #待改進：尚未考量回饋上限
 #recommend_list回傳string(ex:現金回饋5%)
 def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,rd_or_ap): #用戶擁有的卡種編號(list)
-    print('PLACE NAME:',place_name)
     card_dict=[] #用戶所沒有的卡種編號 [{'卡種編號'},{'卡種編號']]
     cash_recommend_list=[]
 
@@ -702,12 +676,9 @@ def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_si
         for elem in tmp_card_dict:
             if(elem['cardID'] not in own_tmp_card_dict['cardID'].keys()):
                 card_dict.append(elem)
-    #print('CARD DICT:',card_dict)
     for tmp_card in card_dict:
         similar_person_id=""
         cardID=tmp_card['cardID']
-        print('card id:',cardID)
-        #print('CASH CARDID:',cardID)
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
         tmp_dict = json.loads(resp_tmp) #dict
@@ -729,7 +700,6 @@ def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_si
                 if cardID in sim_tmp_dict['cardID'].keys():
                     similar_person_id=similar_person_id+person['id']
                     break
-        print('sim person id:',similar_person_id)
         if(tmp_dict['cashReward'] is not None): #判斷該卡是否有現金回饋優惠
             if(not can_use_in_here(place_name,tmp_dict['excludeLocation'])):
                 if("現金回饋4" in tmp_dict['cashReward'].keys()): 
@@ -749,9 +719,7 @@ def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_si
                     elif(total_consumption_last_month(cardID,similar_person_id)>=tmp_dict['cashReward']['現金回饋1'][4] and (can_use_in_here(place_name,tmp_dict['cashReward']['現金回饋1'][3]) or "不限" in tmp_dict['cashReward']['現金回饋1'][3]) and (place_name not in cannot_use_in_here(tmp_dict['cashReward']['現金回饋1'][3]))):
                         cash_recommend_list.append({'cardID':cardID,'現金回饋%數':tmp_dict['cashReward']['現金回饋1'][0],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'回饋上限':has_limit_or_not(tmp_dict['cashReward']['現金回饋1'][2])})
                 elif("現金回饋2" in tmp_dict['cashReward'].keys()): 
-                    print('in cash 2')
                     if(total_consumption_last_month(cardID,similar_person_id)>=tmp_dict['cashReward']['現金回饋2'][4] and (can_use_in_here(place_name,tmp_dict['cashReward']['現金回饋2'][3]) or "不限" in tmp_dict['cashReward']['現金回饋2'][3]) and place_name not in cannot_use_in_here(tmp_dict['cashReward']['現金回饋2'][3])):
-                        print('in cash 2 if')
                         cash_recommend_list.append({'cardID':cardID,'現金回饋%數':tmp_dict['cashReward']['現金回饋2'][0],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'回饋上限':has_limit_or_not(tmp_dict['cashReward']['現金回饋2'][2])})
                     elif(total_consumption_last_month(cardID,similar_person_id)>=tmp_dict['cashReward']['現金回饋1'][4] and (can_use_in_here(place_name,tmp_dict['cashReward']['現金回饋1'][3]) or "不限" in tmp_dict['cashReward']['現金回饋1'][3]) and (place_name not in cannot_use_in_here(tmp_dict['cashReward']['現金回饋1'][3]))):
                         cash_recommend_list.append({'cardID':cardID,'現金回饋%數':tmp_dict['cashReward']['現金回饋1'][0],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'回饋上限':has_limit_or_not(tmp_dict['cashReward']['現金回饋1'][2])})
@@ -759,7 +727,7 @@ def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_si
                     if(tmp_dict['cashReward']['現金回饋1'] is not None):
                         if(total_consumption_last_month(cardID,similar_person_id)>=tmp_dict['cashReward']['現金回饋1'][4] and (can_use_in_here(place_name,tmp_dict['cashReward']['現金回饋1'][3]) or "不限" in tmp_dict['cashReward']['現金回饋1'][3]) and (place_name not in cannot_use_in_here(tmp_dict['cashReward']['現金回饋1'][3]))):
                             cash_recommend_list.append({'cardID':cardID,'現金回饋%數':tmp_dict['cashReward']['現金回饋1'][0],'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'回饋上限':has_limit_or_not(tmp_dict['cashReward']['現金回饋1'][2])})
-    #print('cash rec list: ',cash_recommend_list)             
+           
     result = sorted(cash_recommend_list,key = lambda i:(-i['現金回饋%數'],-i['回饋上限'])) 
     tmp_per=result[0]['現金回饋%數']
     tmp_index=0
@@ -775,8 +743,7 @@ def cash_return_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_si
             tmp_index=tmp_index
         else:
             tmp_per=i['現金回饋%數']
-            tmp_index=result.index(i)  
-    print('cash result:',result)     
+            tmp_index=result.index(i)      
     recommend_list={'lat':lat,'lng':lng,'placeName':place_name}
     if(rd_or_ap==0):
         if(len(result)>=3):
@@ -842,7 +809,6 @@ def gas_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,r
     
     for tmp_card in card_dict:
         cardID=tmp_card['cardID']
-        print('cardID:',cardID)
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
         tmp_dict = json.loads(resp_tmp) #dict
@@ -869,7 +835,6 @@ def gas_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,r
                     break   
         #判斷此卡是否有加油優惠
         if(tmp_dict['gasReward'] is not None):
-            print('has reward')
             can_use_in_here=0
             #判斷是否在此地可用
             for i in tmp_dict['gasRewLocation']:
@@ -914,7 +879,6 @@ def gas_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,r
                         save_recommend.append({'cardID':cardID,'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'加油方式':reward_mode,'可用星期':reward_weekday,'現折金額':reward_account})
                     #result = sorted(save_recommend,key = lambda i: i['現折金額'],reverse=True) #由大到小 
         elif(tmp_dict['gasCashReward'] is not None):
-            print('has cash reward')
             can_use_in_here=0
             #判斷是否在此地可用
             for i in tmp_dict['gasRewLocation']:
@@ -942,7 +906,6 @@ def gas_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,r
                     else:
                         reward_recommend.append({'cardID':cardID,'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'加油現金回饋%數':sec_reward})
         elif(tmp_dict['gasCash'] is not None):
-            print('has gas cash')
             #%數優先於金額
             #由當期消費限制大往小
             gm_result=sorted(tmp_dict['gasCash'],key = lambda i: i['當期消費限制'],reverse=True) #由大到小
@@ -956,7 +919,6 @@ def gas_discount_for_apply_withLocation(lat,lng,place_name,auth_id,is_sim_auth,r
                         money_recommend_wen.append({'cardID':cardID,'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'加油金回饋':int(limit['加油金回饋'][:limit['加油金回饋'].rfind('元')])})
                         break
         elif(tmp_dict['gasPointReward'] is not None):
-            print('has point')
             can_use_in_here=0
             #判斷是否在此地可用
             for i in tmp_dict['gasRewLocation']:
@@ -1033,7 +995,6 @@ def point_return_discount_for_apply_withLocation(lat,lng,place_name,place_type,a
     
     for tmp_card in card_dict:
         cardID=tmp_card['cardID']
-        print('cardID: ',cardID)
         card = mongo.db.reward.find_one({'cardID': cardID}) #Bson
         resp_tmp = dumps(card) #Json
         tmp_dict = json.loads(resp_tmp) #dict
@@ -1061,7 +1022,6 @@ def point_return_discount_for_apply_withLocation(lat,lng,place_name,place_type,a
                     if cardID in sim_tmp_dict['cardID'].keys():
                         similar_person_id=person['id']
                         break
-                print('similar_person_id: ',similar_person_id)
                 #取出此人此卡的level
                 per_cards = mongo.db.cusCreditCard.find_one({'id': similar_person_id}) #Bson
                 per_cards_tmp = dumps(per_cards) #Json
@@ -1078,7 +1038,6 @@ def point_return_discount_for_apply_withLocation(lat,lng,place_name,place_type,a
             #先判斷有無回饋倍數與生日當月紅利回饋倍數，再將兩者比較並存入recommend_list
             if(tmp_dict['pointRewDes'] is not None): #回饋倍數
                 if(not can_use_in_here(place_name,tmp_dict['excludeLocation'])):
-                    print('point can use')
                     for reward in tmp_dict['pointRewDes']:
                         can_use_in_place=0 
                         #判斷是否可在此地使用
@@ -1126,9 +1085,7 @@ def point_return_discount_for_apply_withLocation(lat,lng,place_name,place_type,a
                 if return_point!=0 and dollar_per_point!=0:
                     point_recommend_list.append({'cardID':cardID,'銀行':tmp_card['bankID'],'卡名':tmp_dict['cardName'],'紅利幾元一點':dollar_per_point,'紅利倍數':return_point,'紅利回饋上限':tmp_max_return})
 
-    #print('POINT REC LIST:',point_recommend_list)
     result=sorted(point_recommend_list,key = lambda i: ((-i['紅利倍數']),i['紅利幾元一點'],(-i['紅利回饋上限'])))
-    #print('point sorted result1: ',result)
     tmp_per=result[0]['紅利倍數']
     tmp_wen=result[0]['紅利幾元一點']
     tmp_index=0
@@ -1149,7 +1106,6 @@ def point_return_discount_for_apply_withLocation(lat,lng,place_name,place_type,a
             tmp_per=i['紅利倍數']
             tmp_wen=i['紅利幾元一點']
             tmp_index=result.index(i)
-    #print('point sorted result2: ',result)
     recommend_list={'lat':lat,'lng':lng,'placeName':place_name}
     if rd_or_ap==0:
         if(len(result)>=3):
@@ -1396,7 +1352,6 @@ def total_consumption_last_month(cardID, auth_id):
     tmp_dict = json.loads(resp_tmp) #dict
     if len(tmp_dict)==0:
         return 0
-    print('last month:',tmp_dict[0]['total'])
     return tmp_dict[0]['total']
 
 #計算該卡前三個月的消費金額
@@ -1409,7 +1364,6 @@ def total_consumption_last_three_months(cardID, auth_id):
     tmp_dict = json.loads(resp_tmp) #dict
     if len(tmp_dict)==0:
         return 0
-    print('three month:',tmp_dict[0]['total'])
     return tmp_dict[0]['total']
 
 #計算該卡前十二個月的消費金額
@@ -1422,7 +1376,6 @@ def total_consumption_last_year(cardID, auth_id):
     tmp_dict = json.loads(resp_tmp) #dict
     if len(tmp_dict)==0:
         return 0
-    print('three month:',tmp_dict[0]['total'])
     return tmp_dict[0]['total']
 
 # 判斷用戶偏好現金回饋還是紅利回饋
@@ -1441,8 +1394,3 @@ def cash_or_point(auth_id):
     #現金>紅利    
     else:
         return 'cash'
-
-# enviroment context: 
-# (天氣陰天)
-# (天氣晴天)
-# (天氣雨天)
