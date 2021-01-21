@@ -13,37 +13,16 @@ import pandas as pd
 from sklearn import cluster,metrics
 from sklearn.tree import DecisionTreeClassifier # Import Decision Tree Classifier
 from sklearn.model_selection import train_test_split # Import train_test_split function 
-#from sklearn.tree.export import export_text
 from sklearn.tree import _tree
 from geopy.geocoders import Nominatim
-gmaps = googlemaps.Client(key = 'AIzaSyBlUJmvjnGDlcV7WDYVLns8J85hnu7X_90') 
-
-#'convenient_store', 'mall', 'gas_station', 'theater', 'parking_lot', 'restuarant', 'hypermarket'
-#1便利 2百貨 3加油 4電影 5停車 6餐廳 7賣場
-# 紅利 現金 電影 停車 加油
-# 百貨：[現金 紅利] (停車)
-# 加油戰：加油 [紅利 現金]
-# 停車場：停車 [現金 紅利]
-# 電影院：電影 [現金 紅利]
-# 餐廳：[現金 紅利]
-#----------------------------------------------------------------------------------------
-# place type
-# 便利商店: convenience_store
-# 百貨公司: department_store, shopping_mall
-# 加油站: gas_station
-# 電影院: movie_theater
-# 停車場: parking
-# 餐廳: cafe, restaurant
-# 大賣場: supermarket
+gmaps = googlemaps.Client(key = 'API_KEY') 
 
 #==============================================================用卡推薦==============================================================#
-
-#--------------------------------------------------------------更新版本--------------------------------------------------------------#
 
 #kmean分群，計算每群每個地點類型的百分比並排序，由大而小給個地點類型加分
 #回傳：[[各地點類型該加上的分數],[1,2,3,4,5],[]...]
 def kmean_score_and_tree():
-    df = pd.read_csv('/Users/peggy/Desktop/Tweet_CARD_code/prefer2.0.csv')
+    df = pd.read_csv('prefer2.0.csv')
     x = df[['age', 'sex', 'annualIncome', 'expenseMonth','mall', 'gas_station', 'theater', 'parking_lot',
        'restuarant']][0:239]
     #k-means++的方法就是讓初始中心之間的距離盡可能地遠使得加速 迭代過程的收斂
@@ -134,12 +113,9 @@ def tree_to_code(tree, feature_names,feature_value):
         
     group=recurse(0, 1)
     return group
- 
-#--------------------------------------------------------------更新版本end--------------------------------------------------------------#
 
-# version1:單純用出現頻率判斷地點類型偏好
-# 記帳紀錄 db:google location
-# 0便利 1百貨 2加油 3電影 4停車 5餐廳 6賣場
+# version1:單純用在記帳紀錄出現頻率判斷地點類型偏好
+# 0百貨 1加油 2電影 3停車 4餐廳
 # 記帳類別->地點類別
 def book_keeping_record_by_freq(auth_id, context_sum, weight):
     records = mongo.db.googleLocation.find({'id': auth_id}) #Bson
@@ -158,11 +134,11 @@ def book_keeping_record_by_freq(auth_id, context_sum, weight):
         if(record['locationType']=='餐廳'):
             place_count[4]+=1
     result = sorted(place_count,key = place_count.get, reverse=True) #由大到小->頻率高到低 #list
-    b_count=len(result) #5
+    b_count=len(result) 
     tmp_value=0
     for i in range(len(result)):
-        key=result[i] #int
-        value= place_count[result[i]]#int
+        key=result[i] 
+        value= place_count[result[i]]
         if(i==0):
             tmp_value=value
             context_sum[key]+=len(result)
@@ -176,8 +152,7 @@ def book_keeping_record_by_freq(auth_id, context_sum, weight):
     return context_sum
 
 # version2:兩個月內，同一個星期幾，前後兩小時，與現在時間點最近的一種地點類型分數最高(記帳類型->地點類型)
-# 記帳紀錄 db:google location
-# 0便利 1百貨 2加油 3電影 4停車 5餐廳 6賣場
+# 0百貨 1加油 2電影 3停車 4餐廳
 # 記帳類別->地點類別
 def book_keeping_record_by_time(auth_id, context_sum, weight):
     now=datetime.now()
@@ -189,9 +164,7 @@ def book_keeping_record_by_time(auth_id, context_sum, weight):
         compare={'百貨公司':-1,'加油站':-1,'電影院':-1,'停車場':-1,'餐廳':-1} #用來記錄該地點類型目前距離tmp_now最近的秒數
         tmp_now=now-timedelta(days=i)
         tmp_later=two_hour_later-timedelta(days=i)
-        #tmp_later=tmp_later.strftime('%Y-%m-%dT%X')+'.000Z' #轉為str
         tmp_before=two_hour_before-timedelta(days=i)
-        #tmp_before=tmp_before.strftime('%Y-%m-%dT%X')+'.000Z' #轉為str
 
         #只取前後兩個小時內的資料
         limit_records = mongo.db.googleLocation.find({'id': auth_id,'locationTime': {
@@ -211,11 +184,11 @@ def book_keeping_record_by_time(auth_id, context_sum, weight):
                 compare[rec['locationType']]=tmp_dis
         result = sorted(compare,key = compare.get, reverse=True) #由小到大 #list['停車場','加油站'...]
         #若值為-1就表示該時間區間內沒有有關該地點類型的交易紀錄->place_count不加
-        b_count=len(result) #5
+        b_count=len(result)
         tmp_value=0
         for i in range(len(result)):
-            key=convert[result[i]] #int
-            value= compare[result[i]]#int
+            key=convert[result[i]] 
+            value= compare[result[i]]
             if(value!=-1):
                 if(tmp_value==0):
                     tmp_value=value
@@ -234,8 +207,9 @@ def book_keeping_record_by_time(auth_id, context_sum, weight):
         n_count-=1
     return context_sum 
         
-#與所有地點類型最近的那個點比較
-#destinations=[五個地點的座標] (按照01234)
+# 將用戶當下位置與所有地點類型最近的那個點比較
+# destinations=[五個地點的座標] (按照01234)
+# 0百貨 1加油 2電影 3停車 4餐廳
 def distance(origin, destinations, context_sum, weight):
     duration_result=[]
     count=0
@@ -248,8 +222,6 @@ def distance(origin, destinations, context_sum, weight):
     dis_count=len(result)
     tmp_value=0
     for i in range(len(result)):
-        #key=int(list(result[i].keys())[0]) #int
-        #value=int(list(result[i].values())[0]) #int
         key=result[i]['id']
         value=result[i]['duration_time']
         if(i==0):
