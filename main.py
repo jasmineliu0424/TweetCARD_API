@@ -8,31 +8,14 @@ import ast
 import json
 from datetime import datetime,timedelta
 import googlemaps
-gmaps = googlemaps.Client(key = 'AIzaSyBlUJmvjnGDlcV7WDYVLns8J85hnu7X_90')
+gmaps = googlemaps.Client(key = 'API_KEY')
 
-# 取得更多資訊
-@app.route('/get_card_inform/<cardID>', methods=['GET'])
-def get_one_star(cardID):
-    result = mongo.db.creditCard
-    s = result.find_one({'cardID' : cardID})
-    if s:
-        
-        output = {'cardName' : s['cardName'],
-                    'ageLimit' : s['ageLimit'],
-                    'annIncomeLimit' : s['annIncomeLimit'],
-                    'annualFee' : s['annualFee'],
-                    'annualFeeDes' : s['annualFeeDes']}
+#------------------------------------------------------用卡推薦------------------------------------------------------#
 
-    else:
-        output = "No such name"
-    return jsonify({'result' : output})
-
-# 用卡推薦(前面按鈕的部分)
-# 計算出用戶對各地點類型的喜好程度並排序
-# 判斷用戶是哪個身份(舊用戶/假小白(有信用卡無記帳紀錄)/真小白(無信用卡無記帳紀錄))->使用哪些情境
+# 依據用戶當下地點、時速、過往記帳紀錄、地點類型偏好，計算出用戶現在可能會在哪個地點類型(EX:停車場、餐廳)
+# 跳出排序好的最有可能的地點類型讓用戶選擇
+# 判斷用戶是哪個身份(舊用戶/假小白(有信用卡無記帳紀錄)/真小白(無信用卡無記帳紀錄))->分析不同資料
 # 回傳: {'auth_id':auth:id,'recommend_order':['餐廳','加油站'....]}
-# origin=('25.041583,121.543776')
-# destinations=[('25.0418665', '121.5449721'),('25.0443825', '121.5368178'),('25.0460629', '121.5441717'),('25.0410177', '121.5442342'),('25.0404935', '121.5465572')]
 @app.route('/api/recommend/use/<auth_id>/<speed_now>', methods=['GET'])
 def recommend_place_for_use(auth_id, speed_now):
     place_name=['百貨公司','加油站','電影院','停車場','餐廳']
@@ -55,7 +38,7 @@ def recommend_place_for_use(auth_id, speed_now):
     feature_value['age']=tmp_dict['age']
     feature_value['sex']=tmp_dict['sex']
     feature_value['annualIncome']=tmp_dict['annualIncome']
-    feature_value['expenseMonth']=tmp_dict['expenseMonth'] #要再寫一個計算的
+    feature_value['expenseMonth']=tmp_dict['expenseMonth']
 
     #真假小白
     if(context.user_status(auth_id)=='new'):
@@ -86,12 +69,11 @@ def recommend_place_for_use(auth_id, speed_now):
     resp['result'].append(resp_result)
     return resp             
 
-# 用卡推薦
-# 真小白->同辦卡推薦
+# 用卡推薦：用戶選擇某一地點類型後，會依據該地點類型可能會用到什麼優惠，以及當下地點(EX:嘟嘟房)，推薦三張最優惠且最適合的卡片
 # post 因為要取得app回傳的半徑五公里的地點名稱與經緯度{'destinations':[{'name':地點名稱,'lat','lng'},{'name':地點名稱,'lat','lng'}]}
 # 百貨：[現金 紅利] (停車)
-# 回傳：{'recommed_result':[{一個地點的三個推薦},{}]}
 # 當用戶按下‘百貨公司’按鈕後
+# 回傳：{'recommed_result':[{一個地點三張推薦的卡},{}]}
 @app.route('/api/recommend/use/place/mall/<auth_id>', methods=['POST'])
 def mall_recommend(auth_id):
     _json = request.data
@@ -174,7 +156,7 @@ def mall_recommend(auth_id):
     return resp
 
 # 加油站：加油 [紅利 現金]
-#當用戶按下‘加油站’按鈕後
+# 當用戶按下‘加油站’按鈕後
 @app.route('/api/recommend/use/place/gas_station/<auth_id>', methods=['POST'])
 def gas_recommend(auth_id):
     _json = request.data
@@ -253,7 +235,7 @@ def gas_recommend(auth_id):
     return resp
 
 # 電影院：電影 [現金 紅利]
-#當用戶按下‘電影院’按鈕後
+# 當用戶按下‘電影院’按鈕後
 @app.route('/api/recommend/use/place/theater/<auth_id>', methods=['POST'])
 def theater_recommend(auth_id):
     _json = request.data
@@ -332,7 +314,7 @@ def theater_recommend(auth_id):
     return resp
 
 # 停車場：停車 [現金 紅利]
-#當用戶按下‘停車場’按鈕後
+# 當用戶按下‘停車場’按鈕後
 @app.route('/api/recommend/use/place/parking_lot/<auth_id>', methods=['POST'])
 def parking_recommend(auth_id):
     _json = request.data
@@ -411,7 +393,7 @@ def parking_recommend(auth_id):
     return resp
 
 # 餐廳：[現金 紅利]
-#當用戶按下‘餐廳’按鈕後
+# 當用戶按下‘餐廳’按鈕後
 @app.route('/api/recommend/use/place/restaurant/<auth_id>', methods=['POST'])
 def restaurant_recommend(auth_id):
     _json = request.data
@@ -471,8 +453,7 @@ def restaurant_recommend(auth_id):
 
 #------------------------------------------------辦卡推薦(無地點因素)------------------------------------------------#
 
-# 辦卡推薦(沒有地點因素)(用最常去的地點)
-# find_freq_place：{'name':地點名稱,'type':地點類別,'lat','lng'}
+# 辦卡推薦：依據客戶基本資料以及地點找出符合客戶條件且在該地點最優惠的卡片
 # 對該用戶最常去的地點做推薦(真小白會找跟他同群的某人最常去的地點)
 @app.route('/api/recommend/apply/no_place/<auth_id>', methods=['GET'])
 def recommend_place_for_apply(auth_id):
@@ -492,9 +473,8 @@ def recommend_place_for_apply(auth_id):
             feature_value['age']=cus_tmp_dict['age']
             feature_value['sex']=cus_tmp_dict['sex']
             feature_value['annualIncome']=cus_tmp_dict['annualIncome']
-            feature_value['expenseMonth']=cus_tmp_dict['expenseMonth'] #要再寫一個計算的
+            feature_value['expenseMonth']=cus_tmp_dict['expenseMonth'] 
             similar_persons=context.find_similar_(auth_id,feature_value)
-            #print('similar person: ',similar_persons)
             sim_auth_id=similar_persons[0]['id']
             print('sim_auth_id: ',sim_auth_id)
             place=context.find_freq_place(sim_auth_id)
@@ -538,9 +518,25 @@ def recommend_place_for_apply_withPlace(auth_id):
         resp=context.recommend_discount_for_place(auth_id, place,0)
     return resp
 
+#---------------------------------------------用卡/辦卡通用----------------------------------------------#
+
+# 取得該卡資訊
+@app.route('/api/get/card_info/<cardID>', methods=['GET'])
+def get_card_info(cardID):
+    result = mongo.db.creditCard.find_one({'cardID' : cardID})
+    if result:
+        output = {'cardName' : result['cardName'],
+                  'ageLimit' : result['ageLimit'],
+                  'annIncomeLimit' : result['annIncomeLimit'],
+                  'annualFee' : result['annualFee'],
+                  'annualFeeDes' : result['annualFeeDes']
+        }
+    else:
+        output = "No such card"
+    return jsonify({'result' : output})
+
 #------------------------------------------------勾選畫面------------------------------------------------#
 #用戶基本資料->偏好地點類型->偏好優惠類型
-
 #接收使用者填寫的用戶基本資料
 #post接收後再存到資料庫(Customer)
 @app.route('/api/customer/<auth_id>/api/personal_data/add', methods=['POST'])
@@ -631,181 +627,9 @@ def change_personal_data(auth_id):
 
 #------------------------------------------------轉換資料------------------------------------------------#
 
-#這個應該在他每記一筆記帳紀錄的時候轉換一次？->只取最新加入的一筆資料作轉換
+#這個應該在他每記一筆記帳紀錄的時候轉換一次->只取最新加入的一筆資料作轉換
 #將某人的記帳紀錄轉為google location所需的欄位，並insert(只把屬於我們有做的地點類別的紀錄作轉換)
 #只用place type來判斷他到底是哪個地點類型
-@app.route('/api/bookkeeping/api/convert', methods=['GET'])
-def bookkeeping_to_gLocation():
-    id_=[
-    'E127082107',
-    'E178566103',
-    'E189424472',
-    'E173411750',
-    'E165410847',
-    'E123712483',
-    'E175816480',
-    'E151979094',
-    'E166454596',
-    'E187014409',
-    'E164315259',
-    'E176943862',
-    'E194088655',
-    'E130945360',
-    'E182875124',
-    'E125774324',
-    'E139065023',
-    'E126596994',
-    'E142292144',
-    'E154035908',
-    'E169006239',
-    'E182011191',
-    'E172971843',
-    'E190632374',
-    'E168212001',
-    'E181398160',
-    'E123467998',
-    'E136180235',
-    'E194807617',
-    'E185858870',
-    'E127280552',
-    'E161828007',
-    'E139114919',
-    'E153764656',
-    'E173223297',
-    'E132978769',
-    'E150039928',
-    'E162710348',
-    'E180503298',
-    'E161950958',
-    'E197551072',
-    'E127020185',
-    'E147461517',
-    'E123723925',
-    'E139495739',
-    'E148758109',
-    'E164076911',
-    'E141440487',
-    'E154563920',
-    'E167074043',
-    'E167478546',
-    'E175319153',
-    'E190296453',
-    'E127529508',
-    'E181835846',
-    'E194861706',
-    'E127055866',
-    'E127920353',
-    'E139928675',
-    'E154912947']
-    phoneNum=[
-    '0902842298',
-    '0906641028',
-    '0902556156',
-    '0902771109',
-    '0908517740',
-    '0901855922',
-    '0905517716',
-    '0902728674',
-    '0908597384',
-    '0904297586',
-    '0902882944',
-    '0906740584',
-    '0905294596',
-    '0908195281',
-    '0908505950',
-    '0903988404',
-    '0906019686',
-    '0904763967',
-    '0904669405',
-    '0908308058',
-    '0902116238',
-    '0906568231',
-    '0907741242',
-    '0905301322',
-    '0901773532',
-    '0908640023',
-    '0902720821',
-    '0904916910',
-    '0901887906',
-    '0906056539',
-    '0906582958',
-    '0905309777',
-    '0906397421',
-    '0907838410',
-    '0907728077',
-    '0904527037',
-    '0902537483',
-    '0905229028',
-    '0903668534',
-    '0901605504',
-    '0901560339',
-    '0908663408',
-    '0906324836',
-    '0902999351',
-    '0904228401',
-    '0907029409',
-    '0908970948',
-    '0903886762',
-    '0908830376',
-    '0907665466',
-    '0908455363',
-    '0901831705',
-    '0903079958',
-    '0908427133',
-    '0903333814',
-    '0907501059',
-    '0906039617',
-    '0904089837',
-    '0905480710',
-    '0906158329']
-    #for i,j in zip(id_,phoneNum): #要轉朋友的話把#去掉，下面auth_id=i, phoneNum=j
-    auth_id= 'A101498569'
-    phoneNum= '0906056539'
-    #print('auth id: ',i)
-    #print('phoneNum: ',j)
-    dict_place={'百貨公司':['department_store', 'shopping_mall'],'加油站': ['gas_station'],'電影院': ['movie_theater'],'停車場': ['parking'],'餐廳': ['cafe', 'restaurant']}
-    records = mongo.db.bookkeepingRecord.find({'id': auth_id}) #Bson #只取最後一筆(最新的一筆)
-    resp_tmp = dumps(records) #Json
-    tmp_dict = json.loads(resp_tmp) #dict 
-    #print('tmp_dict:',tmp_dict)
-    for record in tmp_dict:
-        include=0 #判斷是否包含在我們要做的地點類型裡面，若無就不轉換也不存入
-        resp_dict={}
-        find_place_result=gmaps.find_place(input=record['consumeStore'], input_type="textquery",fields=['place_id','formatted_address','types'])
-        if len(find_place_result['candidates'])==0:
-            pass
-        else:
-            tmp_type=find_place_result['candidates'][0]['types'] #list
-            for name, place_type in dict_place.items():
-                for i in tmp_type:
-                    if(i in place_type):
-                        resp_dict['locationType']=name
-                        include=1
-            if(include==1):
-                #print('insert')
-                dd=int(record['consumeTime']['$date'])
-                dt_obj = datetime.fromtimestamp(dd/1000.0)  
-                resp_dict['id']=auth_id
-                resp_dict['phoneNum']=phoneNum
-                resp_dict['locationName']=record['consumeStore']
-                resp_dict['address']=find_place_result['candidates'][0]['formatted_address']
-                geocode_result = gmaps.geocode(find_place_result['candidates'][0]['formatted_address'])
-                resp_dict['latitude']=geocode_result[0]['geometry']['location']['lat']
-                resp_dict['longitude']=geocode_result[0]['geometry']['location']['lng']
-                resp_dict['locationTime']=dt_obj
-                id = mongo.db.googleLocation.insert_one(resp_dict) # insert()會返回ObjectId類型的_id屬性
-                print(resp_dict)
-        # #對用戶狀態做檢查
-        # u_records = mongo.db.customer.find_one({'id':auth_id}) #Bson
-        # u_resp_tmp = dumps(u_records) #Json
-        # u_tmp_dict = json.loads(u_resp_tmp) #dict
-        # if(u_tmp_dict['status']!='old'):
-        #     WriteResult = mongo.db.customer.update({'id':auth_id},{'$set':{"status":context.user_status(auth_id)}}) # update()會返回WriteResult document that contains the status of the operation.
-    
-    resp = jsonify('Converted successfully!')
-    resp.status_code = 200
-    return resp
-'''
 @app.route('/api/bookkeeping/<auth_id>/<phoneNum>/api/convert', methods=['GET'])
 def bookkeeping_to_gLocation(auth_id, phoneNum):
     dict_place={'百貨公司':['department_store', 'shopping_mall'],'加油站': ['gas_station'],'電影院': ['movie_theater'],'停車場': ['parking'],'餐廳': ['cafe', 'restaurant']}
@@ -832,18 +656,18 @@ def bookkeeping_to_gLocation(auth_id, phoneNum):
             resp_dict['longitude']=geocode_result[0]['geometry']['location']['lng']
             resp_dict['locationTime']=record['consumeTime']
             id = mongo.db.googleLocation.insert(resp_dict) # insert()會返回ObjectId類型的_id屬性
-    #對用戶狀態做檢查
-    u_records = mongo.db.customer.find_one({'id':auth_id}) #Bson
-    u_resp_tmp = dumps(u_records) #Json
-    u_tmp_dict = json.loads(u_resp_tmp) #dict
-    if(u_tmp_dict['status']!='old'):
-       WriteResult = mongo.db.customer.update({'id':auth_id},{'$set':{"status":context.user_status(auth_id)}}) # update()會返回WriteResult document that contains the status of the operation.
+#     對用戶狀態做檢查
+#     u_records = mongo.db.customer.find_one({'id':auth_id}) #Bson
+#     u_resp_tmp = dumps(u_records) #Json
+#     u_tmp_dict = json.loads(u_resp_tmp) #dict
+#     if(u_tmp_dict['status']!='old'):
+#        WriteResult = mongo.db.customer.update({'id':auth_id},{'$set':{"status":context.user_status(auth_id)}}) # update()會返回WriteResult document that contains the status of the operation.
     resp = jsonify('Converted successfully!')
     resp.status_code = 200
     return resp
-'''
-#在他每記一筆記帳紀錄的時候，重新計算一次他的月平均消費(計算近六個月的月平均花費)
-#當他是舊用戶的時候再更新他的月平均消費
+
+# 在他每記一筆記帳紀錄的時候，重新計算一次他的月平均消費(計算近六個月的月平均花費)
+# 當他是舊用戶的時候再更新他的月平均消費
 @app.route('/api/bookkeeping/<auth_id>/api/count_average_cost', methods=['GET'])
 def count_average_cost(auth_id):
     records = mongo.db.customer.find_one({'id':auth_id}) #Bson 
@@ -871,7 +695,7 @@ def count_average_cost(auth_id):
     else:
         return jsonify('not changed!')
 
-#------------------------------------------------分析資料(for dashboard)------------------------------------------------#
+#------------------------------------------------------------------------------------------------------------#
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')
