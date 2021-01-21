@@ -75,7 +75,8 @@ def kmean_score_and_tree():
     clf = clf.fit(X_train,y_train)
     return [clf,group_place_score,feature_cols]
 
-
+# for 新加入用戶
+# 根據用戶的基本資料(年齡/性別/年收入/月消費)與先前得到的決策樹來為該用戶分群，並將該群對地點類型的偏好結果作為該用戶的偏好
 def classification_(clf,group_place_score,feature_value,feature_cols,context_sum):
     group=tree_to_code(clf,feature_cols,feature_value)
     score_list=group_place_score[group]
@@ -83,8 +84,8 @@ def classification_(clf,group_place_score,feature_value,feature_cols,context_sum
         context_sum[i]+=score_list[i]
     return context_sum
 
-
-#feature_value:{age,income,avg_cost,sex}
+# 回傳用戶所在分群節點號碼
+# feature_value:{age,income,avg_cost,sex}
 def tree_to_code(tree, feature_names,feature_value):
     tree_ = tree.tree_
     feature_name = [
@@ -94,7 +95,6 @@ def tree_to_code(tree, feature_names,feature_value):
     #print("def tree({}):".format(", ".join(feature_names)))
 
     def recurse(node, depth):
-        #indent = "  " * depth
         if tree_.feature[node] != _tree.TREE_UNDEFINED:
             name = feature_name[node] #str
             threshold = tree_.threshold[node] #float
@@ -237,8 +237,8 @@ def distance(origin, destinations, context_sum, weight):
     return context_sum
 
 # 地點類型偏好
+# 根據一開始用戶勾選的消費地點偏好來對各地點類型加分
 # 0百貨 1加油 2電影 3停車 4餐廳 
-# 待修改
 def place_preference(auth_id, context_sum,weight):
     records = mongo.db.customer.find_one({'id': auth_id}) #Bson
     resp_tmp = dumps(records) #Json
@@ -255,7 +255,7 @@ def place_preference(auth_id, context_sum,weight):
         context_sum[4]+=1
     return context_sum
 
-# 0百貨 1加油 2電影 3停車 4餐廳 
+# 依據用戶當下時速來對各地點類型加分
 # (1)會開車&時速>30
 # (2)會開車&時速<30
 # (3)不會開車 -> 不加分
@@ -272,15 +272,7 @@ def speed(speed_now, auth_id, context_sum, weight):
 
 #==============================================================辦卡推薦(常去地點)==============================================================#
 
-#db['!all'].aggregate([
-#  {$match:
-#    {'GENDER': 'F',
-#     'DOB':
-#      { $gte: 19400801,
-#        $lte: 20131231 } } },
-#  {$group : {_id : "$by_user", num_tutorial : {$sum : 1}}}
-#])
-# 計算最常去的地點名稱
+# 從記帳紀錄中找出最常去的地點名稱
 # 回傳最常去的地點名稱、地點類別、經緯度：{'name':地點名稱,'type':地點類別,'lat','lng'}
 def find_freq_place(auth_id):
     count_dict=dict()
@@ -294,7 +286,7 @@ def find_freq_place(auth_id):
         else: #新地點
             count_dict[record['locationName']]=1
     result=sorted(count_dict.items(), key=lambda x: x[1], reverse=True) #由大到小 回傳：[(地點名稱,筆數),(地點名稱,筆數)...]
-    #print('freq place result:',result)
+
     # 找出最常去的地點，並回傳{'name':地點名稱,'type':地點類別,'lat','lng'}
     records = mongo.db.googleLocation.find_one({'locationName': result[0][0]}) #Bson
     resp_tmp = dumps(records) #Json
@@ -303,12 +295,11 @@ def find_freq_place(auth_id):
     resp['type']=tmp_dict['locationType']
     resp['lat']=tmp_dict['latitude']
     resp['lng']=tmp_dict['longitude']
-    #print('resp: ',resp)
     return resp
 
-#find_similar
+# 找出與該用戶在同一個分群的人
 def find_similar_(auth_id,feature_value):
-    df = pd.read_csv('/Users/peggy/Desktop/Tweet_CARD_code/prefer2.0.csv')
+    df = pd.read_csv('prefer2.0.csv')
     x = df[['age', 'sex', 'annualIncome', 'expenseMonth','mall', 'gas_station', 'theater', 'parking_lot',
        'restuarant']][0:239]
     #k-means++的方法就是讓初始中心之間的距離盡可能地遠使得加速 迭代過程的收斂
@@ -364,6 +355,7 @@ def find_similar_(auth_id,feature_value):
 
     return person
 
+# 回傳該分群的label以作為在資料庫篩選的限制
 def tree_to_compare(tree, feature_names,feature_value):
     tree_ = tree.tree_
     feature_name = [
@@ -372,7 +364,7 @@ def tree_to_compare(tree, feature_names,feature_value):
     ]
     #print("def tree({}):".format(", ".join(feature_names)))
 
-    def recurse(node, depth, less_pre, grt_pre): #less_pre:{'income':430000,'age':40}
+    def recurse(node, depth, less_pre, grt_pre): # Ex: less_pre:{'income':430000,'age':40}
         #indent = "  " * depth
         if tree_.feature[node] != _tree.TREE_UNDEFINED:
             name = feature_name[node] #str
@@ -504,8 +496,12 @@ def find_place_nearby(lat,lng):
 
 #==============================================================辦卡推薦==============================================================#
 
-# for 辦卡推薦
-# 針對最常去的地點(或一個地點)來做推薦
+# 針對最常去的地點(或一個地點)來做信用卡推薦，各地點依下面優惠順序進行推薦
+# 百貨公司：[現金 紅利] (停車)
+# 加油站：加油 [紅利 現金]
+# 停車場：停車 [現金 紅利]
+# 電影院：電影 [現金 紅利]
+# 餐廳：[現金 紅利]
 # 回傳：{'recommend_result':{'緯度':,'經度':,'地點名稱':,'fir_recommend_cardID':...}}
 def recommend_discount_for_place(auth_id, place, is_sim_auth):
     resp=dict()
@@ -592,9 +588,9 @@ def recommend_discount_for_place(auth_id, place, is_sim_auth):
 
 #==============================================================通用功能==============================================================# 
 
-#判斷用戶是老手還是新手->可用來改變用戶身份狀態
-#判斷他有沒有三個月以上的記帳紀錄且筆數有250筆以上
-#回傳str(novice,senior)
+#判斷用戶是舊用戶還是新用戶->可用來改變用戶身份狀態
+#判斷他有沒有三個月以上的記帳紀錄且筆數有250筆以上->若有就將身份改為舊用戶
+#回傳str(old,new)
 #目前先暫時寫在這，到時候再移到context那邊，之後用import的方式來main這邊用
 def user_status(auth_id):
     records = mongo.db.bookkeepingRecord.find({'id':auth_id}) #Bson
@@ -655,458 +651,7 @@ def can_drive_or_not(auth_id):
     else:
         return 'no'
 
-#==============================================================備案們==============================================================#
-# for真小白
-# 找與他相似的人們
-# 回傳該人在Customer表裡的所有欄位(dict)
-def find_similar(auth_id):
-    records = mongo.db.customer.find_one({'id': auth_id}) #Bson
-    resp_tmp = dumps(records) #Json
-    i = json.loads(resp_tmp) #dict
-    if(i['income']<=435000):
-        if(i['income']<=165000):
-            records = mongo.db.customer.find({'income':{'$lte': 165000}}) #Bson
-            resp_tmp = dumps(records) #Json
-            person = json.loads(resp_tmp) #dict
-        else:
-            if(i['income']<=315000):
-                records = mongo.db.customer.find({'income':{'$gt': 165000, '$lte': 315000}}) #Bson
-                resp_tmp = dumps(records) #Json
-                person = json.loads(resp_tmp) #dict
-            else:
-                records = mongo.db.customer.find({'income':{'$gt': 315000, '$lte': 435000}}) #Bson
-                resp_tmp = dumps(records) #Json
-                person = json.loads(resp_tmp) #dict
-    else:
-        if(i['income']<=760000):
-            if(i['income']<=555000):
-                if(i['avg_cost']<=170000):
-                    records = mongo.db.customer.find({'income':{'$gt': 435000, '$lte': 555000},'avg_cost':{'$lte': 170000}}) #Bson
-                    resp_tmp = dumps(records) #Json
-                    person = json.loads(resp_tmp) #dict
-                else:
-                    records = mongo.db.customer.find({'income':{'$gt': 435000, '$lte': 555000},'avg_cost':{'$gt': 170000}}) #Bson
-                    resp_tmp = dumps(records) #Json
-                    person = json.loads(resp_tmp) #dict
-            else:
-                if(i['income']<=625000):
-                    records = mongo.db.customer.find({'income':{'$gt': 555000, '$lte': 625000}}) #Bson
-                    resp_tmp = dumps(records) #Json
-                    person = json.loads(resp_tmp) #dict
-                else:
-                    if(i['avg_cost']<145000):
-                        records = mongo.db.customer.find({'income':{'$gt': 625000, '$lte': 760000},'avg_cost':{'$lt': 145000}}) #Bson
-                        resp_tmp = dumps(records) #Json
-                        person = json.loads(resp_tmp) #dict
-                    else:
-                        records = mongo.db.customer.find({'income':{'$gt': 625000, '$lte': 760000},'avg_cost':{'$gte': 145000}}) #Bson
-                        resp_tmp = dumps(records) #Json
-                        person = json.loads(resp_tmp) #dict
-        else: 
-            if(i['income']<=1150000):
-                if(i['income']<=935000):
-                    records = mongo.db.customer.find({'income':{'$gt': 760000, '$lte': 935000}}) #Bson
-                    resp_tmp = dumps(records) #Json
-                    person = json.loads(resp_tmp) #dict
-                else:
-                    if(i['avg_cost']<280000):
-                        records = mongo.db.customer.find({'income':{'$gt': 935000, '$lte': 1150000},'avg_cost':{'$lt': 280000}}) #Bson
-                        resp_tmp = dumps(records) #Json
-                        person = json.loads(resp_tmp) #dict
-                    else:
-                        records = mongo.db.customer.find({'income':{'$gt': 935000, '$lte': 1150000},'avg_cost':{'$gte': 280000}}) #Bson
-                        resp_tmp = dumps(records) #Json
-                        person = json.loads(resp_tmp) #dict
-            else: 
-                if(i['income']<=1300000):
-                    records = mongo.db.customer.find({'income':{'$gt': 1150000, '$lte': 1300000}}) #Bson
-                    resp_tmp = dumps(records) #Json
-                    person = json.loads(resp_tmp) #dict
-                else: 
-                    if(i['income']<=1750000):
-                        if(i['avg_cost']<=300000):
-                            records = mongo.db.customer.find({'income':{'$gt': 1300000, '$lte': 1750000},'avg_cost':{'$lte': 300000}}) #Bson
-                            resp_tmp = dumps(records) #Json
-                            person = json.loads(resp_tmp) #dict
-                        else:
-                            records = mongo.db.customer.find({'income':{'$gt': 1300000, '$lte': 1750000},'avg_cost':{'$gt': 300000}}) #Bson
-                            resp_tmp = dumps(records) #Json
-                            person = json.loads(resp_tmp) #dict
-                    else:
-                        if(i['income']<=2250000):
-                            records = mongo.db.customer.find({'income':{'$gt': 1750000, '$lte': 225000}}) #Bson
-                            resp_tmp = dumps(records) #Json
-                            person = json.loads(resp_tmp) #dict
-                        else:
-                            if(i['income']<=4250000):
-                                records = mongo.db.customer.find({'income':{'$gt': 2250000, '$lte': 4250000}}) #Bson
-                                resp_tmp = dumps(records) #Json
-                                person = json.loads(resp_tmp) #dict
-                            else:
-                                records = mongo.db.customer.find({'income':{'$gt': 4250000}}) #Bson
-                                resp_tmp = dumps(records) #Json
-                                person = json.loads(resp_tmp) #dict
-    return person
-
-# version2:不包含大賣場和便利商店
-# for假小白與真小白
-def classification(auth_id, context_sum, weight):
-    # personal context
-    # ['age', 'sex', 'income', 'avg_cost'] 
-    # 0百貨 1加油 2電影 3停車 4餐廳 
-    records = mongo.db.customer.find_one({'id': auth_id}) #Bson
-    resp_tmp = dumps(records) #Json
-    tmp_dict = json.loads(resp_tmp) #dict
-    i=tmp_dict
-    if(i['income']<=435000):
-        if(i['income']<=165000):
-            #4: 4>2>0>1=3
-            context_sum[4]+=5
-            context_sum[2]+=4
-            context_sum[0]+=3
-            context_sum[1]+=2
-            context_sum[3]+=2
-        else:
-            if(i['income']<=315000):
-                #15: 4>0=1=3>2
-                context_sum[4]+=5
-                context_sum[0]+=4
-                context_sum[1]+=4
-                context_sum[3]+=4
-                context_sum[2]+=1
-            else:
-                #0: 1=3>4>0>2
-                context_sum[1]+=5
-                context_sum[3]+=5
-                context_sum[4]+=3
-                context_sum[0]+=2
-                context_sum[2]+=1
-    else:
-        if(i['income']<=760000):
-            if(i['income']<=555000):
-                if(i['avg_cost']<=170000):
-                    #13: 1=3>4>0>2
-                    context_sum[1]+=5
-                    context_sum[3]+=5
-                    context_sum[4]+=3
-                    context_sum[0]+=2
-                    context_sum[2]+=1
-                else:
-                    #7: 1=3>4>0>2
-                    context_sum[1]+=5
-                    context_sum[3]+=5
-                    context_sum[4]+=3
-                    context_sum[0]+=2
-                    context_sum[2]+=1
-            else:
-                if(i['income']<=625000):
-                    #8: 1=3>4>0>2
-                    context_sum[1]+=5
-                    context_sum[3]+=5
-                    context_sum[4]+=3
-                    context_sum[0]+=2
-                    context_sum[2]+=1
-                else:
-                    if(i['avg_cost']<145000):
-                        #14: 4>1=3>0>2
-                        context_sum[4]+=5
-                        context_sum[1]+=4
-                        context_sum[3]+=4
-                        context_sum[0]+=2
-                        context_sum[2]+=1
-                    else:
-                        #7: 1=3>4>0>2
-                        context_sum[1]+=5
-                        context_sum[3]+=5
-                        context_sum[4]+=3
-                        context_sum[0]+=2
-                        context_sum[2]+=1
-        else:
-            if(i['income']<=1150000):
-                if(i['income']<=935000):
-                    #3: 1=3>4>0>2
-                    context_sum[1]+=5
-                    context_sum[3]+=5
-                    context_sum[4]+=3
-                    context_sum[0]+=2
-                    context_sum[2]+=1
-                else:
-                    if(i['avg_cost']<280000):
-                        #10: 2=4>5>6>1>0>3
-                        context_sum[1]+=5
-                        context_sum[3]+=5
-                        context_sum[4]+=3
-                        context_sum[0]+=2
-                        context_sum[2]+=1
-                    else:
-                        #12: 1=3=4>0=2
-                        context_sum[1]+=5
-                        context_sum[3]+=5
-                        context_sum[4]+=5
-                        context_sum[0]+=2
-                        context_sum[2]+=2
-            else:
-                if(i['income']<=1300000):
-                    #5: 1=3>0>4>2
-                    context_sum[1]+=5
-                    context_sum[3]+=5
-                    context_sum[0]+=3
-                    context_sum[4]+=2
-                    context_sum[2]+=1
-                else:
-                    if(i['income']<=1750000):
-                        if(i['avg_cost']<=300000):
-                            #1: 2=4>5>0>1=6>3
-                            context_sum[1]+=5
-                            context_sum[3]+=5
-                            context_sum[4]+=3
-                            context_sum[0]+=2
-                            context_sum[2]+=1
-                        else:
-                            #11: 1=3>0=4>2
-                            context_sum[1]+=5
-                            context_sum[3]+=5
-                            context_sum[0]+=3
-                            context_sum[4]+=3
-                            context_sum[2]+=1
-                    else:
-                        if(i['income']<=2250000):
-                            #6: 1=2=3>4>0
-                            context_sum[1]+=5
-                            context_sum[2]+=5
-                            context_sum[3]+=5
-                            context_sum[4]+=2
-                            context_sum[0]+=1
-                        else:
-                            if(i['income']<=4250000):
-                                #9: 1=3=4>0=2
-                                context_sum[1]+=5
-                                context_sum[3]+=5
-                                context_sum[4]+=5
-                                context_sum[0]+=2
-                                context_sum[2]+=2
-                            else:
-                                #2: 0=1=3=4>2
-                                context_sum[0]+=5
-                                context_sum[1]+=5
-                                context_sum[3]+=5
-                                context_sum[4]+=5
-                                context_sum[2]+=1
-    return context_sum
-
-# 紅利 現金 電影 停車 加油
-# 百貨：[現金 紅利] (停車)
-# 加油站：加油 [紅利 現金]
-# 停車場：停車 [現金 紅利]
-# 電影院：電影 [現金 紅利]
-# 餐廳：[現金 紅利]
-# 0百貨 1加油 2電影 3停車 4餐廳 
-# 優惠偏好(待商討要要怎麼用)
-# 待修改(要理解勾選表單回傳的格式是什麼)
-def dicount_preference(auth_id, context_sum, weight):
-    records = mongo.db.customer.find({'id': auth_id}) #Bson
-    resp_tmp = dumps(records) #Json
-    tmp_dict = json.loads(resp_tmp) #dict
-    if(tmp_dict[0]['現金回饋優惠'] is not None):
-        context_sum[0]+=1
-        context_sum[1]+=1
-        context_sum[2]+=1
-        context_sum[3]+=1
-        context_sum[4]+=1
-    if(tmp_dict[0]['紅利回饋優惠'] is not None):
-        context_sum[0]+=1
-        context_sum[1]+=1
-        context_sum[2]+=1
-        context_sum[3]+=1
-        context_sum[4]+=1
-    if(tmp_dict[0]['停車優惠'] is not None):
-        context_sum[0]+=1
-        context_sum[3]+=1
-    if(tmp_dict[0]['加油優惠'] is not None):
-        context_sum[1]+=1
-    if(tmp_dict[0]['電影優惠'] is not None):
-        context_sum[2]+=1
-    return context_sum
-
-# version1:包含大賣場和便利商店
-# for假小白與真小白
-def classification_v1(auth_id, context_sum):
-    # personal context
-    # ['age', 'sex', 'income', 'avg_cost'] 
-    # 0便利 1百貨 2加油 3電影 4停車 5餐廳 6大賣場
-    records = mongo.db.customer.find({'id': auth_id}) #Bson
-    resp_tmp = dumps(records) #Json
-    tmp_dict = json.loads(resp_tmp) #dict
-    i=tmp_dict[0]
-    if(i['income']<=435000):
-        if(i['income']<=165000):
-            #4: 5>0>6>3>1>2=4
-            context_sum[5]+=7
-            context_sum[0]+=6
-            context_sum[6]+=5
-            context_sum[3]+=4
-            context_sum[1]+=3
-            context_sum[2]+=2
-            context_sum[4]+=2
-        else:
-            if(i['income']<=315000):
-                #15: 6>0=5>1=2=4>3
-                context_sum[6]+=7
-                context_sum[0]+=6
-                context_sum[5]+=6
-                context_sum[1]+=4
-                context_sum[2]+=4
-                context_sum[4]+=4
-                context_sum[3]+=1
-            else:
-                #0: 6>2=4>0=5>1>3
-                context_sum[6]+=7
-                context_sum[2]+=6
-                context_sum[4]+=6
-                context_sum[0]+=4
-                context_sum[5]+=4
-                context_sum[1]+=2
-                context_sum[3]+=1
-    else:
-        if(i['income']<=760000):
-            if(i['income']<=555000):
-                if(i['avg_cost']<=170000):
-                    #13: 6>2=4>5>1>0>3
-                    context_sum[6]+=7
-                    context_sum[2]+=6
-                    context_sum[4]+=6
-                    context_sum[5]+=4
-                    context_sum[1]+=3
-                    context_sum[0]+=2
-                    context_sum[3]+=1
-                else:
-                    #7: 0=2=4>6>5>1>3
-                    context_sum[0]+=7
-                    context_sum[2]+=7
-                    context_sum[4]+=7
-                    context_sum[6]+=4
-                    context_sum[5]+=3
-                    context_sum[1]+=2
-                    context_sum[3]+=1
-            else:
-                if(i['income']<=625000):
-                    #8: 2=4=6>5>1>3>0
-                    context_sum[2]+=7
-                    context_sum[4]+=7
-                    context_sum[6]+=7
-                    context_sum[5]+=4
-                    context_sum[1]+=3
-                    context_sum[3]+=2
-                    context_sum[0]+=1
-                else:
-                    if('age'<56):
-                        #14: 5>6>0>2=4>1>3
-                        context_sum[5]+=7
-                        context_sum[6]+=6
-                        context_sum[0]+=5
-                        context_sum[2]+=4
-                        context_sum[4]+=4
-                        context_sum[1]+=2
-                        context_sum[3]+=1
-                    else:
-                        #7: 0=2=4>6>5>1>3
-                        context_sum[0]+=7
-                        context_sum[2]+=7
-                        context_sum[4]+=7
-                        context_sum[6]+=4
-                        context_sum[5]+=3
-                        context_sum[1]+=2
-                        context_sum[3]+=1
-        else:
-            if(i['income']<=1150000):
-                if(i['income']<=935000):
-                    #3: 2=4>5=6>0=1>3
-                    context_sum[2]+=7
-                    context_sum[4]+=7
-                    context_sum[5]+=5
-                    context_sum[6]+=5
-                    context_sum[0]+=3
-                    context_sum[1]+=3
-                    context_sum[3]+=1
-                else:
-                    if(i['avg_cost']<280000):
-                        #10: 2=4>5>6>1>0>3
-                        context_sum[2]+=7
-                        context_sum[4]+=7
-                        context_sum[5]+=5
-                        context_sum[6]+=4
-                        context_sum[1]+=3
-                        context_sum[0]+=2
-                        context_sum[3]+=1
-                    else:
-                        #12: 2=4=5=6>0=1=3
-                        context_sum[2]+=7
-                        context_sum[4]+=7
-                        context_sum[5]+=7
-                        context_sum[6]+=7
-                        context_sum[0]+=3
-                        context_sum[1]+=3
-                        context_sum[3]+=3
-            else:
-                if(i['income']<=1300000):
-                    #5: 2=4>0=1=6>5>3
-                    context_sum[2]+=7
-                    context_sum[4]+=7
-                    context_sum[0]+=5
-                    context_sum[1]+=5
-                    context_sum[6]+=5
-                    context_sum[5]+=2
-                    context_sum[3]+=1
-                else:
-                    if(i['income']<=1750000):
-                        if(i['avg_cost']<=300000):
-                            #1: 2=4>5>0>1=6>3
-                            context_sum[2]+=7
-                            context_sum[4]+=7
-                            context_sum[5]+=5
-                            context_sum[0]+=4
-                            context_sum[1]+=3
-                            context_sum[6]+=3
-                            context_sum[3]+=1
-                        else:
-                            #11: 2=4>0=1=5=6>3
-                            context_sum[2]+=7
-                            context_sum[4]+=7
-                            context_sum[0]+=5
-                            context_sum[1]+=5
-                            context_sum[5]+=5
-                            context_sum[6]+=5
-                            context_sum[3]+=1
-                    else:
-                        if(i['income']<=2250000):
-                            #6: 2=3=4>5=6>0=1
-                            context_sum[2]+=7
-                            context_sum[3]+=7
-                            context_sum[4]+=7
-                            context_sum[5]+=4
-                            context_sum[6]+=4
-                            context_sum[0]+=2
-                            context_sum[1]+=2
-                        else:
-                            if(i['income']<=4250000):
-                                #9: 9: 2=4=5=6>0=1=3
-                                context_sum[2]+=7
-                                context_sum[4]+=7
-                                context_sum[5]+=7
-                                context_sum[6]+=7
-                                context_sum[0]+=3
-                                context_sum[1]+=3
-                                context_sum[3]+=3
-                            else:
-                                #2: 0=1=2=4=5=6>3
-                                context_sum[0]+=7
-                                context_sum[1]+=7
-                                context_sum[2]+=7
-                                context_sum[6]+=7
-                                context_sum[4]+=7
-                                context_sum[5]+=7
-                                context_sum[3]+=1
-    return context_sum
+#==============================================================資料表之間的轉換==============================================================#
 
 #version1:只用place type來判斷他到底是哪個地點類型
 #將某人的記帳紀錄轉為google location所需的欄位，並insert(只把屬於我們有做的地點類別的紀錄作轉換)
