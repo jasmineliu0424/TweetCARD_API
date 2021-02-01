@@ -46,10 +46,11 @@ def recommend_place_for_use(auth_id, speed_now):
         resp_tmp = dumps(records) #Json
         tmp_dict = json.loads(resp_tmp) #dict
         #真小白
-        if(tmp_dict['cardID'] is None):
+        if(tmp_dict['cardID'] is None): # no credit card
             context_sum=context.classification_(clf,group_place_score,feature_value,feature_cols,context_sum)
             context_sum=context.distance(origin, destinations, context_sum,1)
             context_sum=context.place_preference(auth_id, context_sum,1)
+            context_sum=context.speed(speed_now, auth_id, context_sum,1)
         #假小白
         else:
             context_sum=context.classification_(clf,group_place_score,feature_value,feature_cols,context_sum)
