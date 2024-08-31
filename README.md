@@ -12,3 +12,16 @@ Tweet C.A.R.D. 是一款開放程式應用介面（Open Application Programming 
 另外，我們提供了「***信用卡分析介面***」給銀行，銀行可藉由此Dashboard，去檢視自家的信用卡出現在推薦結果上的頻率、使用者常使用的信用卡、常去的店家等資訊，有助於銀行分析潛在客群、得出自家信用卡和同業之間的競爭力，以及評估未來可以合作的店家，作為未來銀行金融相關業務發展策略的參考。
 
 經由這款API，我們將能與多個商家APP、TSP業者、銀行進行串接，透過資料的共享，更加了解顧客的背景與需求。我們期望能在使用者產生消費意圖的情境當下就準確地滿足需求，不僅縮短使用者的決策時間，更促進了使用者對我們推薦系統API的使用頻率，進而提升使用者對串接端APP的依賴度。
+
+### Abstract
+Tweet C.A.R.D. is an Open Application Programming Interface (Open API) service that allows app developers, banks, and TSP operators to integrate the '***Credit Card Recommendation API***,' enabling users to receive more personalized recommendations. This recommendation API identifies similar users based on their ***demographic data, reward preference, and monthly expense***. It also considers the ***user's location and current time*** to recommend the credit card that best meets their needs.
+
+Currently, we focus on providing recommendations at two key moments: ***'applying for a credit card'*** and ***'making purchases with a credit card,'*** both of which are highly relevant to credit card usage.
+
+When applying for a credit card, we concentrate on two scenarios: 'the consumer develops a desire to apply for a card based on their current location,' and 'the consumer simply wants to explore suitable card options.'
+
+In the context of making purchases with a credit card, due to the overwhelming variety of credit card rewards, it’s challenging to cover all options comprehensively in a short time. Therefore, based on the 2018 popular card types statistics from SocialLab, we selected a few of the most frequently used categories for recommendations: ***cashback, reward points, parking discounts, fuel discounts, and movie discounts***. We also categorize purchase moments based on different consumer behaviors (e.g., shopping, parking, fueling, etc.).
+
+Additionally, we provide a ***'Credit Card Analysis Interface'** for banks. Through this dashboard, banks can monitor how often their credit cards appear in recommendation results, which cards are frequently used by users, popular stores, and more. This helps banks analyze potential customer segments, assess their cards' competitiveness against other banks, and evaluate future partnership opportunities with merchants, serving as a reference for future financial business development strategies.
+
+Through this API, we can connect with multiple merchant apps, TSP operators, and banks. By sharing data, we can gain a deeper understanding of customer backgrounds and needs. Our goal is to accurately meet user needs at the moment they have the intent to make a purchase, not only shortening their decision-making time but also increasing the frequency of our recommendation system API’s use, thereby enhancing user dependence on the apps.
